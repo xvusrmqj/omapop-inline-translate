@@ -1,0 +1,34 @@
+#popclip
+name: Inline Translate
+identifier: io.github.olv.inline-translate
+description: Translate the selected text and show the result in a popup. In place, no browser, no API key. Powered by translate-shell (Bing/Google engines). Works everywhere Bing is reachable, including mainland China.
+icon: circle filled 译
+interpreter: bash
+shell script file: translate.sh
+after: show-result
+requirements: [text]
+options:
+  - identifier: target
+    label: Translate into
+    type: multiple
+    default value: auto
+    values:
+      - auto
+      - zh-Hans
+      - zh-Hant
+      - en
+      - ja
+      - ko
+      - de
+      - fr
+      - es
+      - ru
+      - pt
+  - identifier: engine
+    label: Engine
+    type: multiple
+    default value: auto
+    values:
+      - auto
+      - bing
+      - google
