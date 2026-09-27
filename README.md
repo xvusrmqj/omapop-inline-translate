@@ -47,7 +47,7 @@ Confirm, then enable it from the bar icon → installed extensions.
 ### Option B — clone
 
 ```bash
-git clone https://github.com/olv/omapop-inline-translate.git
+git clone https://github.com/xvusrmqj/omapop-inline-translate.git
 cp -r omapop-inline-translate/InlineTranslate.popclipext ~/.config/omapop/extensions/
 ```
 
