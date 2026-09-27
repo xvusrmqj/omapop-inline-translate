@@ -2,6 +2,7 @@
 # Inline Translate — omapop / PopClip shell-script extension
 # Translates POPCLIP_TEXT and prints the result for show-result.
 # Engines: local Ollama (default, offline) -> Bing -> Google (translate-shell).
+# Single-word lookups are recorded to a local vocabulary file for review.
 set -u
 
 text="${POPCLIP_TEXT:-}"
@@ -44,11 +45,43 @@ langname() {
   esac
 }
 
+# Record a single-word lookup (word, translation, target) with a lookup count.
+# Returns 0 only when the selection was a single Latin-script word.
+record_vocab() { # $1 word  $2 translation  $3 target
+  /usr/bin/python3 -c '
+import datetime, fcntl, json, os, re, sys
+
+word, trans, target = sys.argv[1], sys.argv[2], sys.argv[3]
+if not re.fullmatch("[A-Za-z\u00c0-\u024f\u0027\u2019-]{1,30}", word):
+    sys.exit(1)
+d = os.path.expanduser("~/.local/share/omapop-inline-translate")
+os.makedirs(d, exist_ok=True)
+p = os.path.join(d, "vocab.json")
+now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+data = {}
+try:
+    with open(p, encoding="utf-8") as f:
+        data = json.load(f)
+except Exception:
+    pass
+e = data.get(word) or {"count": 0, "first": now}
+e.update(count=int(e.get("count", 0)) + 1, last=now, target=target,
+         translation=(trans or "").strip().splitlines()[0][:120] if trans.strip() else "")
+data[word] = e
+tmp = p + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    fcntl.flock(f, fcntl.LOCK_EX)
+    json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)
+os.replace(tmp, p)
+' "$1" "$2" "$3" 2>/dev/null
+}
+
 show() { # $1 = translated text, $2 = engine label
-  local arrow="$target"
+  local arrow="$target" mark=""
   [[ "$arrow" == "zh-Hans" ]] && arrow="简体中文"
   [[ "$arrow" == "zh-Hant" ]] && arrow="繁體中文"
-  printf '⇄ %s · %s\n\n%s\n' "$arrow" "$2" "$1"
+  record_vocab "$text" "$1" "$target" && mark=" · 生词+1"
+  printf '⇄ %s · %s%s\n\n%s\n' "$arrow" "$2" "$mark" "$1"
   exit 0
 }
 

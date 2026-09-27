@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""Vocabulary review for omapop-inline-translate.
+
+Commands:
+  vocab [N]        top N words by lookup count (default 30, "all" for everything)
+  vocab recent [N] most recently looked up
+  vocab quiz [N]   flashcards: shows a word, Enter reveals the translation
+  vocab anki       Anki-importable TSV (word<TAB>translation<TAB>count) on stdout
+  vocab words      bare word list on stdout (for piping)
+  vocab md         print the path of the generated Markdown review sheet
+"""
+import json
+import os
+import random
+import sys
+
+PATH = os.path.expanduser("~/.local/share/omapop-inline-translate/vocab.json")
+
+
+def load():
+    try:
+        with open(PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def n_of(args, default=30):
+    for a in args:
+        if a.isdigit():
+            return int(a)
+    return default
+
+
+def table(rows):
+    if not rows:
+        print("No words recorded yet. Translate a single word with Inline Translate first.")
+        return
+    wc = max(len(w) for w, _ in rows)
+    for i, (w, v) in enumerate(rows, 1):
+        print("%4d  %3dx  %-*s  %s  (%s)" % (
+            i, v.get("count", 0), wc, w,
+            (v.get("translation") or "-")[:60], v.get("last", "?")))
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "top"
+    rest = argv[2:]
+    data = load()
+
+    if cmd in ("top", "t", ""):
+        n = None if "all" in rest else n_of(rest, 30)
+        rows = sorted(data.items(), key=lambda kv: (-int(kv[1].get("count", 0)), kv[0]))
+        table(rows if n is None else rows[:n])
+
+    elif cmd == "recent":
+        n = n_of(rest, 30)
+        rows = sorted(data.items(), key=lambda kv: kv[1].get("last", ""), reverse=True)
+        table(rows[:n])
+
+    elif cmd == "quiz":
+        n = n_of(rest, 20)
+        rows = data.items() and random.sample(sorted(data.items()), min(n, len(data)))
+        if not rows:
+            print("Nothing to review yet.")
+            return
+        print("Flashcards: Enter = reveal, q = quit. %d cards.\n" % len(rows))
+        for i, (w, v) in enumerate(rows, 1):
+            try:
+                input("[%d/%d] %s  (looked up %sx) > " % (i, len(rows), w, v.get("count", 0)))
+            except EOFError:
+                print()
+                break
+            print("      %s\n" % (v.get("translation") or "-"))
+        print("Done. 复习完毕!")
+
+    elif cmd == "anki":
+        for w, v in sorted(data.items(), key=lambda kv: -int(kv[1].get("count", 0))):
+            print("%s\t%s\t%d" % (w, v.get("translation", ""), v.get("count", 0)))
+
+    elif cmd == "words":
+        for w, _ in sorted(data.items()):
+            print(w)
+
+    elif cmd == "md":
+        rows = sorted(data.items(), key=lambda kv: (-int(kv[1].get("count", 0)), kv[0]))
+        out = os.path.join(os.path.dirname(PATH), "vocab.md")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write("# Vocabulary / 生词本\n\n")
+            f.write("| # | lookups | word | translation | first | last |\n")
+            f.write("|---|---------|------|-------------|-------|------|\n")
+            for i, (w, v) in enumerate(rows, 1):
+                f.write("| %d | %s | %s | %s | %s | %s |\n" % (
+                    i, v.get("count", 0), w, v.get("translation", ""),
+                    v.get("first", ""), v.get("last", "")))
+        print(out)
+
+    else:
+        print(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

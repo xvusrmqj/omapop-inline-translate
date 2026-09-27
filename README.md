@@ -25,6 +25,7 @@ tab, no API key.
 - **Local AI first**: if [Ollama](https://ollama.com) is running, translation happens fully **offline** on your machine (sub-second with a small model like `qwen3.5:0.8b`, `think:false` so reasoning models answer directly)
 - **Smart direction**: `auto` target translates Chinese → English, everything else → Simplified Chinese (or pick a fixed language)
 - **Fallback chain**: `auto` engine = Ollama → Bing → Google, so it keeps working offline *and* behind the Great Firewall (Bing is reachable from mainland China)
+- **Vocabulary tracking / 生词本**: single-word lookups are recorded with a lookup count to `~/.local/share/omapop-inline-translate/vocab.json` — review them with the bundled `vocab` CLI (list, flashcard quiz, Anki export, Markdown sheet)
 - **No account, no API key** — plain Ollama + [translate-shell](https://github.com/soimort/translate-shell)
 - Runs under Omapop's hardened child-process environment (`shell mode: none`, minimal PATH, no proxy vars — local Ollama doesn't care)
 - Also works on macOS PopClip itself (same extension format)
@@ -54,9 +55,14 @@ Confirm, then enable it from the bar icon → installed extensions.
 ```bash
 git clone https://github.com/xvusrmqj/omapop-inline-translate.git
 cp -r omapop-inline-translate/InlineTranslate.popclipext ~/.config/omapop/extensions/
+cp omapop-inline-translate/vocab ~/.local/bin/ && chmod +x ~/.local/bin/vocab  # optional, for review
 ```
 
 Then click the Omapop bar icon → enable **Inline Translate**.
+
+> The snippet install (Option A) ships the same translation logic, but the
+> `vocab` review CLI and this README live in the repo — clone if you want the
+> full vocabulary workflow.
 
 ### Install on macOS PopClip
 
@@ -99,6 +105,24 @@ deadline.
   if you use a model that ignores it, switch to Bing.
 - **Network engines hang behind a proxy** — Omapop strips proxy variables from
   child processes on purpose; the local Ollama engine is immune to this.
+
+## Vocabulary review / 生词复习
+
+Every time you translate a **single word** (Latin script, ≤30 chars — phrases and
+Chinese selections are not recorded), it is appended to
+`~/.local/share/omapop-inline-translate/vocab.json` with a lookup count, first/last
+seen timestamps and the translation. The popup confirms with a `生词+1` marker.
+
+Review with the bundled CLI:
+
+```bash
+vocab              # top 30 by lookup count
+vocab all          # everything
+vocab recent       # most recently looked up
+vocab quiz 20      # flashcards: word → Enter → translation
+vocab anki > deck.tsv   # export for Anki (word<TAB>translation<TAB>count)
+vocab md           # regenerate + print the Markdown review sheet path
+```
 
 ## License
 
