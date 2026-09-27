@@ -12,28 +12,33 @@ tab, no API key.
 ┌─────────────────────────────────────────┐
 │ The quick brown fox jumps over the dog. │   ← select this
 └─────────────────────────────────────────┘
-        ┌──────────────────────┐
-        │ ⇄ 简体中文 · bing     │
-        │                      │
-        │ 敏捷的棕色狐狸跳过狗。 │   ← popup result
-        └──────────────────────┘
+        ┌──────────────────────────────┐
+        │ ⇄ 简体中文 · qwen3.5:0.8b     │
+        │                              │
+        │ 敏捷的棕色狐狸跳过狗。         │   ← popup result
+        └──────────────────────────────┘
 ```
 
 ## Features / 特性
 
 - **In-place popup** via PopClip's `show-result` — nothing opens, nothing steals focus
-- **Smart direction**: `auto` target translates Chinese → English, everything else → Simplified Chinese (flip it by picking a fixed language)
-- **China-friendly**: defaults to the **Bing** engine (reachable from mainland China), falls back to Google
-- **No account, no API key** — plain [translate-shell](https://github.com/soimort/translate-shell)
-- 11 target languages, selectable engine
+- **Local AI first**: if [Ollama](https://ollama.com) is running, translation happens fully **offline** on your machine (sub-second with a small model like `qwen3.5:0.8b`, `think:false` so reasoning models answer directly)
+- **Smart direction**: `auto` target translates Chinese → English, everything else → Simplified Chinese (or pick a fixed language)
+- **Fallback chain**: `auto` engine = Ollama → Bing → Google, so it keeps working offline *and* behind the Great Firewall (Bing is reachable from mainland China)
+- **No account, no API key** — plain Ollama + [translate-shell](https://github.com/soimort/translate-shell)
+- Runs under Omapop's hardened child-process environment (`shell mode: none`, minimal PATH, no proxy vars — local Ollama doesn't care)
 - Also works on macOS PopClip itself (same extension format)
 
 ## Requirements / 依赖
 
-| Dependency | Install |
-|---|---|
-| translate-shell | Arch/Omarchy: `sudo pacman -S translate-shell` · macOS: `brew install translate-shell` · Debian: `sudo apt install translate-shell` |
-| bash, python3, coreutils (`timeout`) | already on Omarchy / macOS |
+Pick **one** (or both for fallback):
+
+| Dependency | Install | Used by |
+|---|---|---|
+| [Ollama](https://ollama.com) + any chat model | `sudo pacman -S ollama` then `ollama pull qwen3.5:0.8b` | default engine, offline |
+| translate-shell | Arch: `sudo pacman -S translate-shell` · macOS: `brew install translate-shell` | Bing/Google engines |
+
+bash, curl, jq, python3, coreutils are expected (already on Omarchy).
 
 ## Install (Omapop) / 安装
 
@@ -65,14 +70,35 @@ Open the Omapop bar icon → gear next to Inline Translate:
 | Option | Default | Values |
 |---|---|---|
 | Translate into | `auto` | auto, zh-Hans, zh-Hant, en, ja, ko, de, fr, es, ru, pt |
-| Engine | `auto` | auto (bing→google), bing, google |
+| Engine | `auto` | auto (ollama→bing→google), ollama, bing, google |
+| Ollama model | `qwen3.5:0.8b` | any local `ollama list` name, e.g. `qwen3:4b` |
+
+**Tip / 提示**: a 0.8B model is fast but rough on idioms. For hard passages
+set Engine to `bing` (or let `auto` fall through when Ollama is off).
 
 ## How it works / 原理
 
-A plain shell script (`translate.sh`) runs [translate-shell](https://github.com/soimort/translate-shell)
-with the selection passed in `POPCLIP_TEXT`, detects CJK to pick the direction,
-tries Bing then Google, and prints the result for `show-result`. Selections are
-capped at 4000 chars; each engine call has a 30 s timeout.
+A plain shell script (`translate.sh`) runs under the selection's popup: it
+detects CJK to pick the direction, then tries engines in order —
+
+1. **Ollama** at `127.0.0.1:11434` via `/api/chat` with `think:false`,
+   `temperature 0`, `num_predict 800`, bypassing any system proxy
+   (`--noproxy '*'`)
+2. **Bing** via `trans -e bing` (reachable in mainland China)
+3. **Google** via `trans -e google`
+
+— and prints the winner for `show-result`. Selections are capped at 4000 chars;
+per-engine timeouts (Ollama 75 s, trans 30 s) stay inside Omapop's 120 s child
+deadline.
+
+## Troubleshooting / 排错
+
+- **Spinner then nothing** — usually means the script died early: check that
+  `ollama ps` shows your model (Ollama running) or that `trans` is installed.
+- **Reasoning model returns empty text** — this extension sends `think:false`;
+  if you use a model that ignores it, switch to Bing.
+- **Network engines hang behind a proxy** — Omapop strips proxy variables from
+  child processes on purpose; the local Ollama engine is immune to this.
 
 ## License
 

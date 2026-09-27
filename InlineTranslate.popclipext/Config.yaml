@@ -1,9 +1,10 @@
 #popclip
 name: Inline Translate
 identifier: io.github.xvusrmqj.inline-translate
-description: Translate the selected text and show the result in a popup. In place, no browser, no API key. Powered by translate-shell (Bing/Google engines). Works everywhere Bing is reachable, including mainland China.
+description: Translate the selected text and show the result in a popup. In place, no browser, no API key. Local Ollama first (offline), then Bing/Google via translate-shell. Works in mainland China.
 icon: circle filled 译
 interpreter: bash
+shell mode: none
 shell script file: translate.sh
 after: show-result
 requirements: [text]
@@ -30,5 +31,10 @@ options:
     default value: auto
     values:
       - auto
+      - ollama
       - bing
       - google
+  - identifier: model
+    label: Ollama model
+    type: string
+    default value: qwen3.5:0.8b
